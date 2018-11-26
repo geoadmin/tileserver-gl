@@ -11,7 +11,8 @@ module.exports = function(options, repo, params, id, reportTiles, reportFont) {
   var app = express().disable('x-powered-by');
 
   var styleFile = path.resolve(options.paths.styles, params.style);
-
+  var serverDataPath = options.paths.server_data_path;
+  var serverStylesPath = options.paths.server_styles_path;
   var styleJSON = clone(require(styleFile));
   Object.keys(styleJSON.sources).forEach(function(name) {
     var source = styleJSON.sources[name];
@@ -29,7 +30,7 @@ module.exports = function(options, repo, params, id, reportTiles, reportFont) {
         }
       }
       var identifier = reportTiles(mbtilesFile, fromData);
-      source.url = 'local://data/' + identifier + '.json';
+      source.url = 'local://'+ serverDataPath + '/' + identifier + '.json';
     }
   });
 
@@ -54,7 +55,7 @@ module.exports = function(options, repo, params, id, reportTiles, reportFont) {
             .replace('{style}', path.basename(styleFile, '.json'))
             .replace('{styleJsonFolder}', path.relative(options.paths.sprites, path.dirname(styleFile)))
             );
-    styleJSON.sprite = 'local://styles/' + id + '/sprite';
+    styleJSON.sprite = 'local://' + serverStylesPath + '/' + id + '/sprite';
   }
   if (styleJSON.glyphs && !httpTester.test(styleJSON.glyphs)) {
     styleJSON.glyphs = 'local://fonts/{fontstack}/{range}.pbf';

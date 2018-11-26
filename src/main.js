@@ -89,7 +89,7 @@ var startWithMBTiles = function(mbtilesFile) {
       }
       var bounds = info.bounds;
 
-      var styleDir = path.resolve(__dirname, "../node_modules/tileserver-gl-styles/");
+      var styleDir = path.resolve(__dirname, "../node_modules/tileserver-gl/-styles/");
 
       var config = {
         "options": {

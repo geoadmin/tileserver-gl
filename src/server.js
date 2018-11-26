@@ -28,6 +28,9 @@ if (!isLight) {
   serve_rendered = require('./serve_rendered');
 }
 
+var serverDataPath = process.env.SERVER_DATA_PATH || 'data'
+var serverStylesPath = process.env.SERVER_STYLES_PATH || 'styles'
+
 function start(opts) {
   console.log('Starting server');
 
@@ -78,7 +81,8 @@ function start(opts) {
   paths.fonts = path.resolve(paths.root, paths.fonts || '');
   paths.sprites = path.resolve(paths.root, paths.sprites || '');
   paths.mbtiles = path.resolve(paths.root, paths.mbtiles || '');
-
+  paths.server_data_path = serverDataPath;
+  paths.server_styles_path = serverStylesPath;
   var startupPromises = [];
 
   var checkPath = function(type) {
@@ -142,7 +146,7 @@ function start(opts) {
         }, function(font) {
           serving.fonts[font] = true;
         }).then(function(sub) {
-          app.use('/styles/', sub);
+          app.use('/'+ serverStylesPath +'/', sub);
         }));
     }
     if (item.serve_rendered !== false) {
@@ -159,7 +163,7 @@ function start(opts) {
               return mbtilesFile;
             }
           ).then(function(sub) {
-            app.use('/styles/', sub);
+            app.use('/'+ serverStylesPath +'/', sub);
           })
         );
       } else {
@@ -183,7 +187,7 @@ function start(opts) {
 
     startupPromises.push(
       serve_data(options, serving.data, item, id, serving.styles).then(function(sub) {
-        app.use('/data/', sub);
+        app.use('/'+ serverDataPath +'/', sub);
       })
     );
   });
@@ -198,7 +202,7 @@ function start(opts) {
         name: styleJSON.name,
         id: id,
         url: req.protocol + '://' + req.headers.host +
-             '/styles/' + id + '/style.json' + query
+             '/' + serverStylesPath + '/' + id + '/style.json' + query
       });
     });
     res.send(result);
@@ -209,7 +213,7 @@ function start(opts) {
       var info = clone(serving[type][id]);
       var path = '';
       if (type == 'rendered') {
-        path = 'styles/' + id;
+        path = serverStylesPath + '/' + id;
       } else {
         path = type + '/' + id;
       }
@@ -224,7 +228,7 @@ function start(opts) {
   app.get('/rendered.json', function(req, res, next) {
     res.send(addTileJSONs([], req, 'rendered'));
   });
-  app.get('/data.json', function(req, res, next) {
+  app.get('/'+ serverDataPath + '.json', function(req, res, next) {
     res.send(addTileJSONs([], req, 'data'));
   });
   app.get('/index.json', function(req, res, next) {
@@ -268,6 +272,8 @@ function start(opts) {
           data['key_query_part'] =
               req.query.key ? 'key=' + req.query.key + '&amp;' : '';
           data['key_query'] = req.query.key ? '?key=' + req.query.key : '';
+          data['server_data_path'] = serverDataPath;
+          data['server_styles_path'] = serverStylesPath;
           if (template === 'wmts') res.set('Content-Type', 'text/xml');
           return res.status(200).send(compiled(data));
         });
@@ -283,6 +289,8 @@ function start(opts) {
       style.name = (serving.styles[id] || serving.rendered[id] || {}).name;
       style.serving_data = serving.styles[id];
       style.serving_rendered = serving.rendered[id];
+      style.server_styles_path=serverStylesPath;
+      style.server_data_path=serverDataPath;
       if (style.serving_rendered) {
         var center = style.serving_rendered.center;
         if (center) {
@@ -298,7 +306,7 @@ function start(opts) {
         
         var tiles = utils.getTileUrls(
             req, style.serving_rendered.tiles,
-            'styles/' + id, style.serving_rendered.format);
+            serverStylesPath  + '/' + id, style.serving_rendered.format);
         style.xyz_link = tiles[0];
       }
     });
@@ -312,6 +320,7 @@ function start(opts) {
                             center[0].toFixed(5);
       }
       data_.is_vector = data_.format == 'pbf';
+      data_.server_data_path=serverDataPath;
       if (!data_.is_vector) {
         if (center) {
           var centerPx = mercator.px([center[0], center[1]], center[2]);
@@ -321,7 +330,7 @@ function start(opts) {
         }
 
         var tiles = utils.getTileUrls(
-            req, data_.tiles, 'data/' + id, data_.format, {
+            req, data_.tiles,  serverDataPath + '/' + id, data_.format, {
               'pbf': options.pbfAlias
             });
         data_.xyz_link = tiles[0];
@@ -346,7 +355,7 @@ function start(opts) {
     };
   });
 
-  serveTemplate('/styles/:id/:version?/$', 'viewer', function(req) {
+  serveTemplate('/' + serverStylesPath + '/:id/:version?/$', 'viewer', function(req) {
     var id = req.params.version ? req.params.id +'/'+req.params.version : req.params.id;
     var style = clone((config.styles || {})[id]);
     if (!style) {
@@ -356,15 +365,16 @@ function start(opts) {
     style.name = (serving.styles[id] || serving.rendered[id]).name;
     style.serving_data = serving.styles[id];
     style.serving_rendered = serving.rendered[id];
+    style.server_styles_path=serverStylesPath;
     return style;
   });
 
   /*
   app.use('/rendered/:id/$', function(req, res, next) {
-    return res.redirect(301, '/styles/' + req.params.id + '/');
+    return res.redirect(301, '/gl-styles/' + req.params.id + '/');
   });
   */
-  serveTemplate('/styles/:id/:version?/wmts.xml', 'wmts', function(req) {
+  serveTemplate('/' + serverStylesPath + '/:id/:version?/wmts.xml', 'wmts', function(req) {
     var id = req.params.version ? req.params.id +'/'+req.params.version : req.params.id;
     var wmts = clone((config.styles || {})[id]);
     if (!wmts) {
@@ -376,10 +386,11 @@ function start(opts) {
     wmts.id = id;
     wmts.name = (serving.styles[id] || serving.rendered[id]).name;
     wmts.baseUrl = (req.get('X-Forwarded-Protocol')?req.get('X-Forwarded-Protocol'):req.protocol) + '://' + req.get('host');
+    wmts.server_styles_path=serverStylesPath;
     return wmts;
   });
 
-  serveTemplate('/data/:id/:version?/$', 'data', function(req) {
+  serveTemplate('/' + serverDataPath + '/:id/:version?/$', 'data', function(req) {
     var id = req.params.version ? req.params.id +'/'+req.params.version : req.params.id;
     var data = clone(serving.data[id]);
     if (!data) {
@@ -387,6 +398,7 @@ function start(opts) {
     }
     data.id = id;
     data.is_vector = data.format == 'pbf';
+    data.server_data_path=serverDataPath;
     return data;
   });
 

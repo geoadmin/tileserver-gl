@@ -25,7 +25,7 @@ module.exports = function(options, repo, params, id, styles) {
   var tileJSON = {
     'tiles': params.domains || options.domains
   };
-
+  var serverDataPath = options.paths.server_data_path;
   var shrinkers = {};
 
   repo[id] = tileJSON;
@@ -178,7 +178,7 @@ module.exports = function(options, repo, params, id, styles) {
   app.get('/' + id + '.json', function(req, res, next) {
     var info = clone(tileJSON);
     info.tiles = utils.getTileUrls(req, info.tiles,
-                                   'data/' + id, info.format, {
+                                   serverDataPath + '/' + id, info.format, {
                                      'pbf': options.pbfAlias
                                    });
     return res.send(info);
